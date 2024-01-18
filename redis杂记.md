@@ -217,4 +217,30 @@ int rdbSaveRio(int req, rio *rdb, int *error, int rdbflags, rdbSaveInfo *rsi)
   - 不同的应用之间应该创建不同的redis实例，而不是使用同一个实例的不同db。
   - 集群模式下，只有一个db0.
 
+  ### 10. Rio的创建
   
+  - 例如，在rdb.c中，在`rdbSaveInternal`函数中调用`rio.c::rioInitWithFile`创建
+  
+  - ```C
+    void rio.c::rioInitWithFile(rio *r, FILE *fp) {
+        *r = rioFileIO; // static的变量。
+        r->io.file.fp = fp;
+        r->io.file.buffered = 0;
+        r->io.file.autosync = 0;
+        r->io.file.reclaim_cache = 0;
+    }
+    static const rio rioFileIO = {
+        rioFileRead,
+        rioFileWrite,
+        rioFileTell,
+        rioFileFlush,
+        NULL,           /* update_checksum */
+        0,              /* current checksum */
+        0,              /* flags */
+        0,              /* bytes read or written */
+        0,              /* read/write chunk size */
+        { { NULL, 0 } } /* union for io-specific vars */
+    };
+    ```
+  
+  - 可以看到有一个

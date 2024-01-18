@@ -82,3 +82,17 @@ B()
 
 - 内核态工作流特点
 
+### 4. rdma_cm: rdma connection manager下的用户态工作流
+
+- rdma_cm是一个主要用于管理rdma通信连接的过程，提供了建立、断开连接和一些基础操作的简单抽象，让rdma更加简单
+- 避免了只使用ibverbs需要交换的global id等信息
+- 详见：https://zhuanlan.zhihu.com/p/494826608
+- CM不依赖于传统以太网卡，可以在infiniband网卡上实现信息交互（比如QPN、Virtual Address和Remote Key）。既是一种协议（Communication Management Protocol），也可以是编程时的API
+- 兼容性不好，不怎么用
+
+### 5. 一些坑
+
+- 有时候qp无法切换到RTR状态，是因为没有用GID
+- 申请GID的时候，需要注意参数ib_port和GID index的值，必须和切换到RTR状态时指定的`ah_attr.port_num, ah_attr.grh.sgid_index`相同
+- 两台机器互相跑的时候，需要保证GID index相同
+- 使用TCP多次传输数据时，要保证client端在server端listen之后再传输，不然就是connection refused
