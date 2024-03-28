@@ -218,9 +218,9 @@ int rdbSaveRio(int req, rio *rdb, int *error, int rdbflags, rdbSaveInfo *rsi)
   - 集群模式下，只有一个db0.
 
   ### 10. Rio的创建
-  
+
   - 例如，在rdb.c中，在`rdbSaveInternal`函数中调用`rio.c::rioInitWithFile`创建
-  
+
   - ```C
     void rio.c::rioInitWithFile(rio *r, FILE *fp) {
         *r = rioFileIO; // static的变量。
@@ -242,5 +242,11 @@ int rdbSaveRio(int req, rio *rdb, int *error, int rdbflags, rdbSaveInfo *rsi)
         { { NULL, 0 } } /* union for io-specific vars */
     };
     ```
-  
+
   - 可以看到有一个
+
+
+  ### 11. 设置redis大小
+
+  - 想要设置redis的总大小为2GB，需要修改`redis.conf`中的`maxmemory`字段
+  - 同时可以指定相应的淘汰政策：当超出了maxmemory时，是按照某种政策淘汰一些键值对，还是直接报错？

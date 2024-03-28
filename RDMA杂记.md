@@ -90,7 +90,40 @@ B()
 - CM不依赖于传统以太网卡，可以在infiniband网卡上实现信息交互（比如QPN、Virtual Address和Remote Key）。既是一种协议（Communication Management Protocol），也可以是编程时的API
 - 兼容性不好，不怎么用
 
-### 5. 一些坑
+### 5. 多进程RDMA
+
+- **不同的进程之间是不同的context，不能直接用父进程的**
+  - 详见：rdma for multiple process
+  - 无状态的object：PD、MR
+  - 有状态的object：QC，CQ，cmd_id
+
+#### shared IB object solution:
+
+- 将IB object和shared fd关联起来
+- 再将shared fd传递给其他进程**（不一定是子进程）**
+- 其他进程通过shared fd使用IB object
+- 适用于传递无状态的IB object：PD、MR
+- 
+- <img src="/Users/beityluo/Library/Application Support/typora-user-images/image-20240320113031861.png" alt="image-20240320113031861" style="zoom: 25%;" />
+
+#### fork solution
+
+- 父进程创建所有RDMA resource的时候都以shared fd创建
+- fork时，所有shared的对象就可以暴露给child
+- <img src="/Users/beityluo/Library/Application Support/typora-user-images/image-20240320113353810.png" alt="image-20240320113353810" style="zoom:25%;" />
+
+#### shared memory solution
+
+- 设置一块shared memory，用来创建相关的rdma resources，并由所有进程共享
+
+### 6. ibv_fork_init
+
+- https://www.rdmamojo.com/2012/05/24/ibv_fork_init/
+- 在fork之前调用，用来避免rdma resources的COW问题
+
+
+
+## 一些坑
 
 - 有时候qp无法切换到RTR状态，是因为没有用GID
 - 申请GID的时候，需要注意参数ib_port和GID index的值，必须和切换到RTR状态时指定的`ah_attr.port_num, ah_attr.grh.sgid_index`相同
