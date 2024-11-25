@@ -394,8 +394,82 @@ TODO，module.c::11248line
   ----------------------------------------
   ```
 
+
+
+### Redis Benchmark流程梳理
+
+- ```C
+  /* 由于多个client之间请求发送与返回是异步的，采用事件循环处理。createClient时将发送请求的事件writeHandler放入循环，
+   * writeHandler中会将接受请求结果的事件readHandler放入循环。readHandler会记录本条请求的时延，检查已发送事件的个数。
+   * 若未达要求，则reset Client，重新发送请求。若达到要求，则结束事件循环。
+   */
+  
+  int main() {} {
+      解析命令行参数;
+      for 所有要测试的指令 {
+          value = genBenchmarkRandomData(); // 随机生成value
+          key = redisFormatCommand()； // 生成一个固定的key，若有-r参数，则会在每次发送请求前在key中插入随机值
+          cmd = key + " " + value;
+          benchmark(指令类型, cmd, len(cmd));
+      }
+  }
+  
+  void benchmark(指令类型，cmd, len) {
+      各种初始化;
+      c = createClient(cmd, len, NULL); // 创建一个母本client
+      createMissingClients(c); // 基于母本创建其余的client。感觉没啥必要，只是加快创建速度
+      
+      aeMain(config.el); // 启动事件循环。createClient中会将发送请求的事件放到循环中。
+      
+      打印结果;
+      free各种资源;
+  }
+  
+  client createClient(cmd, len, source_client) {
+      c->context = redisConnect(); // 连接Redis
+      c->obuf = sdsempty(); // 初始化要发送的请求
+      根据各种奇怪配置，为请求加入一堆prefix;
+      c->prefixlen = sdslen(c->obuf);
+      
+      for 循环config.pipline次{ // 可用于提高吞吐率。默认设置为1.
+          c->obuf = sdscatlen(c->obuf,cmd,len);
+      }
+      
+      // 若有-r参数，找出请求字符串中所有需要生成随机数的位置。以"__rand_int__"标识。
+      if (config.randomkeys) {
+          c->randptr = 所有随机数的offset; // randptr是个指针数组
+          c->randlen = 随机数个数;
+      }
+      
+      // 将writeHandler添加到事件循环中，用于发送请求。
+      aeCreateFileEvent(el,c->context->fd,AE_WRITABLE,writeHandler,c);
+  }
+  
+  void writeHandler(client c) {
+      c->start = ustime();
+      通过redis连接发送请求;
+      aeDeleteFileEvent(el,c->context->fd,AE_WRITABLE); // 标识本次事件处理完毕
+      aeCreateFileEvent(el,c->context->fd,AE_READABLE,readHandler,c); // 将"接受请求结果"的事件加入事件循环
+  }
+  
+  void readHandler(client c) {
+      c->latency = ustime() - c->start;
+      
+      createMissingClient(c);
+      freeClient(c);
+  }
+  
+  void createMissingClient(c) {
+      while(config.liveclients < config.numclients) {
+          create(NULL, 0, c);
+      }
+  }
+  
+  
+  ```
+
 - 
 
-### 17. Redis的Bug
+### Redis的Bug
 
 - 当数据包较大时，readQueryFromClient的最后一次，nread
